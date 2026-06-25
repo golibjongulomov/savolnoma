@@ -84,7 +84,7 @@ ADDED_USERS_FILE  = None
 FAILED_USERS_FILE = None
 CREATE_RETRIES = 3
 RETRY_DELAY_STEP_SECONDS = 10
-RUN_WITHOUT_DELAY_SECONDS = (5, 9)  # (min, max) — har fuqaroda alohida random
+RUN_WITHOUT_DELAY_SECONDS = (3, 6)  # (min, max) — har fuqaroda alohida random
 CURRENT_YEAR = 2026
 
 UZ_PHONE_PREFIXES = (
@@ -891,19 +891,9 @@ def main():
     global DASHBOARD_URL, DASHBOARD_SECRET
     if args.dashboard:
         DASHBOARD_URL = args.dashboard.rstrip("/")
-    else:
-        print("Dashboard URL kiriting (bo'sh = faqat lokal fayl):")
-        raw_url = input("  URL: ").strip().rstrip("/")
-        if raw_url:
-            DASHBOARD_URL = raw_url
+    if args.dashboard_secret:
+        DASHBOARD_SECRET = args.dashboard_secret
     if DASHBOARD_URL:
-        if args.dashboard_secret:
-            DASHBOARD_SECRET = args.dashboard_secret
-        else:
-            print("Dashboard secret kiriting (bo'sh = autentifikatsiyasiz):")
-            raw_secret = input("  Secret: ").strip()
-            if raw_secret:
-                DASHBOARD_SECRET = raw_secret
         print(f"[DASHBOARD] {DASHBOARD_URL}" + (" (himoyalangan)" if DASHBOARD_SECRET else " (ochiq)"))
 
     if args.token:
@@ -1040,22 +1030,7 @@ def main():
                 print(f"    {name:40s}  tug'ilgan: {by}  yosh: {age}")
         return
 
-    # 2. Dashboard statistikasi (o'rganilmagan chegarasini bilish uchun)
-    print("[2] Dashboard statistikasi olinmoqda...")
-    dash = fetch_dashboard_stats()
     unresearched = None
-    if dash:
-        target       = dash["target"]
-        surveyed     = dash["surveyed"]
-        unresearched = dash["unresearched"]
-        print(f"  Ўрганиладиган аҳоли:  {target}")
-        print(f"  Ўрганилган аҳоли:     {surveyed}")
-        print(f"  Ўрганилмаган аҳоли:   {unresearched}")
-        if unresearched <= 0:
-            print(f"\n  TO'XTATILDI: O'rganilmagan aholisi {unresearched} ta — yangi savolnoma kerak emas.")
-            sys.exit(0)
-    else:
-        print("  Dashboard ma'lumotlari olinmadi — cheklovsiz davom etiladi.")
 
     # 3. O'tkazilmaganlar — cache bor bo'lsa o'qiymiz, aks holda API'dan
     if cache_file.exists() and not args.refresh:
