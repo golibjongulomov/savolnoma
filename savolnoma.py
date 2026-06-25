@@ -1233,7 +1233,7 @@ def main():
                 "response": result,
             })
             if args.run_without:
-                delay = random.randint(10, 15)
+                delay = RUN_WITHOUT_DELAY_SECONDS
                 print(f"  Keyingi userdan oldin {delay}s kutish...")
                 time.sleep(delay)
             # Overshoot guard: dashboard unresearched sonidan oshib ketmaslik
@@ -1259,7 +1259,7 @@ def main():
                 "attempts": attempts,
             })
             if args.run_without:
-                delay = random.randint(10, 15)
+                delay = RUN_WITHOUT_DELAY_SECONDS
                 print(f"  Keyingi userdan oldin {delay}s kutish...")
                 time.sleep(delay)
 
