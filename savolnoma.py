@@ -84,7 +84,7 @@ ADDED_USERS_FILE  = None
 FAILED_USERS_FILE = None
 CREATE_RETRIES = 3
 RETRY_DELAY_STEP_SECONDS = 10
-RUN_WITHOUT_DELAY_SECONDS = random.randint(5,9)
+RUN_WITHOUT_DELAY_SECONDS = (5, 9)  # (min, max) — har fuqaroda alohida random
 CURRENT_YEAR = 2026
 
 UZ_PHONE_PREFIXES = (
@@ -1233,7 +1233,7 @@ def main():
                 "response": result,
             })
             if args.run_without:
-                delay = RUN_WITHOUT_DELAY_SECONDS
+                delay = random.randint(*RUN_WITHOUT_DELAY_SECONDS)
                 print(f"  Keyingi userdan oldin {delay}s kutish...")
                 time.sleep(delay)
             # Overshoot guard: dashboard unresearched sonidan oshib ketmaslik
@@ -1259,7 +1259,7 @@ def main():
                 "attempts": attempts,
             })
             if args.run_without:
-                delay = RUN_WITHOUT_DELAY_SECONDS
+                delay = random.randint(*RUN_WITHOUT_DELAY_SECONDS)
                 print(f"  Keyingi userdan oldin {delay}s kutish...")
                 time.sleep(delay)
 
