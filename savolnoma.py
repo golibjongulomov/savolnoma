@@ -20,10 +20,12 @@ except ImportError:
 BASE_URL = "https://mahalla.ijro.uz/api"
 COOKIE   = "route=b5853f2ca5e32178d1b95b3f63906e24|6893784451ec46a48e5aab668b34d4bc"
 
-TOKEN       = None
-REGION_ID   = None
-DISTRICT_ID = None
-MAHALLA_ID  = None
+TOKEN        = None
+REGION_ID    = None
+DISTRICT_ID  = None
+MAHALLA_ID   = None
+DASHBOARD_URL    = None
+DASHBOARD_SECRET = None
 
 
 def _decode_jwt(token: str) -> dict:
@@ -60,6 +62,7 @@ def init_token(token: str):
     Path(f"mahalla_meta_{MAHALLA_ID}.json").write_text(
         json.dumps(meta, ensure_ascii=False), encoding="utf-8"
     )
+    push_to_dashboard("meta", meta)
 
 # ── Barcha createlar uchun bir xil javoblar (15-23) ───────────────────────────
 # MUHIM: extra_features_info va problems_info ARRAY (browser shunday yuboradi).
@@ -81,7 +84,7 @@ ADDED_USERS_FILE  = None
 FAILED_USERS_FILE = None
 CREATE_RETRIES = 3
 RETRY_DELAY_STEP_SECONDS = 10
-RUN_WITHOUT_DELAY_SECONDS = random.randint(4,8)
+RUN_WITHOUT_DELAY_SECONDS = random.randint(5,9)
 CURRENT_YEAR = 2026
 
 UZ_PHONE_PREFIXES = (
@@ -308,6 +311,23 @@ def specialty_for(edu_type):
     return None
 
 
+def push_to_dashboard(record_type, record):
+    if not DASHBOARD_URL:
+        return
+    headers = {}
+    if DASHBOARD_SECRET:
+        headers["X-Secret"] = DASHBOARD_SECRET
+    try:
+        requests.post(
+            f"{DASHBOARD_URL}/api/push",
+            json={"type": record_type, "mahalla_id": MAHALLA_ID, "record": record},
+            headers=headers,
+            timeout=5,
+        )
+    except Exception:
+        pass
+
+
 def ask(msg, default=None):
     """Input with optional default."""
     hint = f" [{default}]" if default is not None else ""
@@ -412,6 +432,8 @@ def append_user_record(path, citizen, status, payload=None, response=None, error
     rows = read_json_list(path)
     rows.append(record)
     write_json_list(path, rows)
+    push_type = "added" if path == ADDED_USERS_FILE else "failed"
+    push_to_dashboard(push_type, record)
     return record
 
 
@@ -466,6 +488,9 @@ def _decode(content):
     return None
 
 
+_HTTP_400 = object()  # 400 permanent error sentinel
+
+
 def post(endpoint, payload, retries=3):
     url = f"{BASE_URL}/{endpoint}"
     body = msgpack.packb(payload, use_bin_type=True)
@@ -478,7 +503,8 @@ def post(endpoint, payload, retries=3):
             err = _decode(r.content) or r.text[:200]
             print(f"    HTTP {r.status_code}: {err}")
             if r.status_code == 400:
-                return None  # payload xatolik — retry foyda yo'q
+                print(f"    400 raw: {r.content!r}")
+                return _HTTP_400  # permanent — caller should not retry
             if r.status_code == 401:
                 print("    401: TOKEN muddati tugagan bo'lishi mumkin. Yangi token kerak.")
                 return None
@@ -494,7 +520,7 @@ def post(endpoint, payload, retries=3):
 
 def is_real_success(result):
     """Server {success: true, response: null} qaytarsa — bu duplicate/rad, haqiqiy success emas."""
-    if not result:
+    if not result or result is _HTTP_400:
         return False
     if isinstance(result, dict):
         # response: null bo'lsa — server rad etgan (duplicate yoki huquq yo'q)
@@ -511,6 +537,10 @@ def create_with_retry(payload, ask_after_auto=True):
         result = post("unified-questionnaire/create", payload, retries=1)
         if is_real_success(result):
             return result, attempts
+        # HTTP 400 — payload xatolik, retry foyda yo'q
+        if result is _HTTP_400:
+            print("  HTTP 400: payload xatolik — retry foyda yo'q.")
+            return None, attempts
         # {success: true, response: null} — serverdan xabar
         if isinstance(result, dict) and result.get("success") and result.get("response") is None:
             print("  Server: success=true lekin response=null (duplicate yoki ruxsat yo'q). Retry foyda yo'q.")
@@ -614,7 +644,6 @@ def build_payload(citizen, fm, integrations):
     print(f"  10.2. family_income = {family_income:,}")
 
     payload = {
-        "id":                   None,
         "family_member_id":     fmid,
         "education_type":       edu_type,
         "specialty":            specialty,
@@ -853,7 +882,29 @@ def main():
                         help="Dashboard statistikasini ko'rish (so'nggi yangilangan)")
     parser.add_argument("--count-underage", action="store_true",
                         help="API'dan fresh data tortib 18 yoshdan kichik fuqarolar sonini chiqarish")
+    parser.add_argument("--dashboard", type=str, default=None,
+                        help="Dashboard URL (masalan: http://192.168.1.5:5000)")
+    parser.add_argument("--dashboard-secret", type=str, default=None,
+                        help="Dashboard push uchun shared secret")
     args = parser.parse_args()
+
+    global DASHBOARD_URL, DASHBOARD_SECRET
+    if args.dashboard:
+        DASHBOARD_URL = args.dashboard.rstrip("/")
+    else:
+        print("Dashboard URL kiriting (bo'sh = faqat lokal fayl):")
+        raw_url = input("  URL: ").strip().rstrip("/")
+        if raw_url:
+            DASHBOARD_URL = raw_url
+    if DASHBOARD_URL:
+        if args.dashboard_secret:
+            DASHBOARD_SECRET = args.dashboard_secret
+        else:
+            print("Dashboard secret kiriting (bo'sh = autentifikatsiyasiz):")
+            raw_secret = input("  Secret: ").strip()
+            if raw_secret:
+                DASHBOARD_SECRET = raw_secret
+        print(f"[DASHBOARD] {DASHBOARD_URL}" + (" (himoyalangan)" if DASHBOARD_SECRET else " (ochiq)"))
 
     if args.token:
         init_token(args.token)
