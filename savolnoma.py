@@ -519,14 +519,10 @@ def post(endpoint, payload, retries=3):
 
 
 def is_real_success(result):
-    """Server {success: true, response: null} qaytarsa — bu duplicate/rad, haqiqiy success emas."""
     if not result or result is _HTTP_400:
         return False
     if isinstance(result, dict):
-        # response: null bo'lsa — server rad etgan (duplicate yoki huquq yo'q)
-        if result.get("success") and result.get("response") is None:
-            return False
-        return True
+        return result.get("success") is True
     return True
 
 
@@ -541,11 +537,6 @@ def create_with_retry(payload, ask_after_auto=True):
         if result is _HTTP_400:
             print("  HTTP 400: payload xatolik — retry foyda yo'q.")
             return None, attempts
-        # {success: true, response: null} — serverdan xabar
-        if isinstance(result, dict) and result.get("success") and result.get("response") is None:
-            print("  Server: success=true lekin response=null (duplicate yoki ruxsat yo'q). Retry foyda yo'q.")
-            return None, attempts
-
         if attempts <= CREATE_RETRIES:
             delay = attempts * RETRY_DELAY_STEP_SECONDS
             print(f"  Create xatolik. Retry {attempts}/{CREATE_RETRIES}: {delay}s kutish...")
@@ -1183,8 +1174,7 @@ def main():
         print("  Yuborilmoqda...")
         result, attempts = create_with_retry(payload, ask_after_auto=not args.run_without)
         if result:
-            print(f"  QO'SHILDI: {full_name}")
-            print(f"  OK! Javob: {json.dumps(result, ensure_ascii=False, default=str)}")
+            print(f"  \033[42m\033[97m SAVOLNOMA YARATILDI: {full_name} \033[0m")
             created += 1
             append_user_record(
                 ADDED_USERS_FILE,
